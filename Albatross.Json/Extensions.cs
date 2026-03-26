@@ -3,11 +3,17 @@ using System.Text.Json.Nodes;
 
 namespace Albatross.Json {
 	public static class Extensions {
-		public static readonly JsonSerializerOptions Options = new() {
-			WriteIndented = true,
-			IndentCharacter = ' ',
-			IndentSize = 4
-		};
+		private static string? FindPropertyKey(JsonObject obj, string key, bool caseInsensitive) {
+			if (!caseInsensitive) {
+				return obj.ContainsKey(key) ? key : null;
+			}
+			foreach (var prop in obj) {
+				if (string.Equals(prop.Key, key, StringComparison.OrdinalIgnoreCase)) {
+					return prop.Key;
+				}
+			}
+			return null;
+		}
 
 		/// <summary>
 		/// Sets a value at the specified path within a JSON node structure.
@@ -29,9 +35,9 @@ namespace Albatross.Json {
 		/// </list>
 		/// </remarks>
 		/// <exception cref="ArgumentException">Thrown when an array index is out of bounds or not a valid integer.</exception>
-		public static JsonNode? SetValue<T>(this JsonNode? node, string[] path, T? value) {
+		public static JsonNode? SetValue<T>(this JsonNode? node, string[] path, T? value, JsonSerializerOptions options) {
 			if (node == null) { node = new JsonObject(); }
-			var serializedValue = System.Text.Json.JsonSerializer.SerializeToNode(value, Options);
+			var serializedValue = System.Text.Json.JsonSerializer.SerializeToNode(value, options);
 			if (path.Length == 0) {
 				return serializedValue;
 			}
@@ -42,12 +48,13 @@ namespace Albatross.Json {
 			for (int i = 0; i < path.Length - 1; i++) {
 				string key = path[i];
 				if (current is JsonObject obj) {
-					if (!obj.TryGetPropertyValue(key, out var next) || next is null || next is JsonValue) {
+					string actualKey = FindPropertyKey(obj, key, options.PropertyNameCaseInsensitive) ?? key;
+					if (!obj.TryGetPropertyValue(actualKey, out var next) || next is null || next is JsonValue) {
 						next = new JsonObject();
-						obj[key] = next;
+						obj[actualKey] = next;
 					}
 					parent = current;
-					parentKey = key;
+					parentKey = actualKey;
 					current = next;
 				} else if (current is JsonArray arr) {
 					if (int.TryParse(key, out int index) && index >= 0 && index < arr.Count) {
@@ -77,7 +84,8 @@ namespace Albatross.Json {
 
 			string finalKey = path[^1];
 			if (current is JsonObject finalObj) {
-				finalObj[finalKey] = serializedValue;
+				string actualFinalKey = FindPropertyKey(finalObj, finalKey, options.PropertyNameCaseInsensitive) ?? finalKey;
+				finalObj[actualFinalKey] = serializedValue;
 			} else if (current is JsonArray finalArr) {
 				if (int.TryParse(finalKey, out int index) && index >= 0 && index < finalArr.Count) {
 					finalArr[index] = serializedValue;
