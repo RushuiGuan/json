@@ -29,7 +29,7 @@ namespace Albatross.Json {
 		/// </list>
 		/// </remarks>
 		/// <exception cref="ArgumentException">Thrown when an array index is out of bounds or not a valid integer.</exception>
-		public static JsonNode? SetValue<T>(JsonNode? node, string[] path, T? value) {
+		public static JsonNode? SetValue<T>(this JsonNode? node, string[] path, T? value) {
 			if (node == null) { node = new JsonObject(); }
 			var serializedValue = System.Text.Json.JsonSerializer.SerializeToNode(value, Options);
 			if (path.Length == 0) {
