@@ -14,7 +14,7 @@
 			json;System.Text.Json;JsonNode;path;nested;set value;json editor;json
 			manipulation;dotnet
 		</PackageTags>
-		<PackageReleaseNotes>See https://rushuiguan.github.io/json/docfx_project/release-notes</PackageReleaseNotes>
+		<PackageReleaseNotes>https://rushuiguan.github.io/json/release-notes.html</PackageReleaseNotes>
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<IncludeSymbols>true</IncludeSymbols>
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
