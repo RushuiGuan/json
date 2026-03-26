@@ -1,36 +1,69 @@
 # Albatross.Json
 
-Path-based JSON value manipulation for System.Text.Json.
+Extension methods for `System.Text.Json` and `JsonNode` objects.
 
 ## Installation
+
 ```shell
 dotnet add package Albatross.Json
 ```
 
-## Usage
+## Features
 
-### SetValue
-Set or update values at any path within a JSON structure.
+- **SetValue** - Set values at any path within a JSON structure
+- **Case-Sensitive/Insensitive** - Control property matching via `JsonSerializerOptions`
+- **Auto Path Creation** - Intermediate objects created automatically
+- **Array Support** - Navigate arrays using numeric string indices
+
+## SetValue Method
+
+```csharp
+public static JsonNode? SetValue<T>(this JsonNode? node, string[] path, T? value, JsonSerializerOptions options)
+```
+
+## Case Sensitivity
+
+**Case-Insensitive** - Matches properties regardless of case, preserves original casing:
+```csharp
+var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+var node = JsonNode.Parse("""{"UserName":"old"}""");
+node = node.SetValue(["username"], "new", options);
+// Result: {"UserName":"new"}
+```
+
+**Case-Sensitive** (default) - Different casing creates separate properties:
+```csharp
+var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = false };
+var node = JsonNode.Parse("""{"Name":"old"}""");
+node = node.SetValue(["name"], "new", options);
+// Result: {"Name":"old","name":"new"}
+```
+
+## Examples
 
 ```csharp
 using Albatross.Json;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
-// Set nested property (creates intermediate objects automatically)
+var options = new JsonSerializerOptions();
+
+// Set nested property
 var node = JsonNode.Parse("{}");
-Extensions.SetValue(node, ["level1", "level2"], "value");
+node = node.SetValue(["level1", "level2"], "value", options);
 // Result: {"level1":{"level2":"value"}}
 
 // Update array element
-var node = JsonNode.Parse("""{"arr":[1,2,3]}""");
-Extensions.SetValue(node, ["arr", "1"], 99);
+node = JsonNode.Parse("""{"arr":[1,2,3]}""");
+node = node.SetValue(["arr", "1"], 99, options);
 // Result: {"arr":[1,99,3]}
 
-// Overwrite value node with object
-var node = JsonNode.Parse("""{"name":"string"}""");
-Extensions.SetValue(node, ["name", "nested"], "value");
-// Result: {"name":{"nested":"value"}}
+// Set property inside array element
+node = JsonNode.Parse("""{"items":[{"id":1}]}""");
+node = node.SetValue(["items", "0", "name"], "first", options);
+// Result: {"items":[{"id":1,"name":"first"}]}
 ```
 
-## Requirements
-- .NET 10.0
+## Documentation
+
+Full documentation: https://rushuiguan.github.io/json/
