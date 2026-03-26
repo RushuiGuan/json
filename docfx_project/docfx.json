@@ -10,10 +10,15 @@
           ]
         }
       ],
-      "out": "api"
+      "output": "api"
     }
   ],
   "build": {
+    "sitemap": {
+      "baseUrl": "https://rushuiguan.github.io/json",
+      "priority": 0.5,
+      "changefreq": "weekly"
+    },
     "content": [
       {
         "files": [
@@ -27,7 +32,10 @@
     "resource": [
       {
         "files": [
-          "images/**"
+          "images/**",
+          "*.html",
+          "robots.txt",
+          ".nojekyll"
         ]
       }
     ],
@@ -38,9 +46,17 @@
     ],
     "globalMetadata": {
       "_appName": "Albatross.Json",
-      "_appTitle": "Albatross.Json",
+      "_appTitle": "Path-based JSON value manipulation for System.Text.Json",
+      "_appLogoPath": "./images/logo.svg",
+      "_appFaviconPath": "./images/favicon.svg",
       "_enableSearch": true,
-      "pdf": false
+      "pdf": false,
+      "_gitContribute": {
+        "repo": "https://github.com/rushuiguan/json",
+        "branch": "main",
+        "path": "docfx_project"
+      },
+      "_gitUrlPattern": "github"
     }
   }
 }

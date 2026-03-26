@@ -11,9 +11,10 @@
 		<PackageIcon>icon.png</PackageIcon>
 		<Authors>Rushui Guan</Authors>
 		<PackageTags>
-            json;json-dom
-        </PackageTags>
-		<PackageReleaseNotes>See https://rushuiguan.github.io/json/release-notes</PackageReleaseNotes>
+			json;System.Text.Json;JsonNode;path;nested;set value;json editor;json
+			manipulation;dotnet
+		</PackageTags>
+		<PackageReleaseNotes>See https://rushuiguan.github.io/json/docfx_project/release-notes</PackageReleaseNotes>
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<IncludeSymbols>true</IncludeSymbols>
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
