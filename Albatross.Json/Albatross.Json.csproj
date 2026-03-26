@@ -4,7 +4,7 @@
 		<TargetFramework>net10.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-        <Description>Path-based JSON value manipulation for System.Text.Json</Description>
+		<Description>Path-based JSON value manipulation for System.Text.Json</Description>
 	</PropertyGroup>
 	<ItemGroup>
 		<None Include="..\icon.png">
