@@ -18,27 +18,48 @@ namespace Albatross.Json {
 		/// <summary>
 		/// Sets a value at the specified path within a JSON node tree, creating or reshaping intermediate nodes as needed.
 		/// </summary>
-		/// <param name="node">Root of the tree to modify. A new <see cref="JsonObject"/> is created when null.</param>
+		/// <param name="node">Root of the tree to modify. A new <see cref="JsonObject"/> is created when <see langword="null"/>.</param>
 		/// <param name="path">
 		/// Dot-free path segments to navigate. Integer strings are treated as array indices;
 		/// all other strings are treated as object property names.
+		/// An empty array replaces the root with the serialized <paramref name="value"/>.
 		/// </param>
 		/// <param name="value">Value to serialize and place at the target path.</param>
-		/// <param name="options">Serializer options applied to both navigation (case sensitivity) and value serialization.</param>
+		/// <param name="options">
+		/// Controls both value serialization and key lookup. When
+		/// <see cref="JsonSerializerOptions.PropertyNameCaseInsensitive"/> is <see langword="true"/>,
+		/// the path segment casing is authoritative: any existing key that matches case-insensitively
+		/// is renamed to match the path segment exactly. For example, navigating path <c>["parent"]</c>
+		/// into a node containing <c>"Parent"</c> renames the key to <c>"parent"</c>.
+		/// Renaming always occurs for intermediate keys during traversal; the final target key is renamed
+		/// only when the write is not suppressed by <paramref name="initOnly"/>.
+		/// </param>
 		/// <param name="initOnly">
-		/// When true, skips the write if a non-null value already exists at the target path.
-		/// Useful for setting defaults without overwriting existing data.
+		/// When <see langword="true"/>, skips the write only if the <b>leaf property</b> already holds a
+		/// non-null value. The type of that existing value is irrelevant — an array, object, or primitive
+		/// are all considered initialized and will be left untouched.
+		/// A missing key or a <see langword="null"/> value at the leaf is treated as uninitialized,
+		/// so the write proceeds; this lets callers correct a property previously set to <see langword="null"/>.
+		/// Intermediate nodes along the path are always reshaped to match the path structure regardless of
+		/// this flag — only the final write at the leaf is guarded. Suppressing the final write also
+		/// suppresses the final-key rename in case-insensitive mode.
 		/// </param>
 		/// <returns>
 		/// The modified root node. When <paramref name="path"/> is empty, returns the serialized
 		/// <paramref name="value"/> directly, replacing the root.
 		/// </returns>
 		/// <remarks>
+		/// <para>
+		/// The existing value at the target path is always replaced regardless of its current type.
+		/// An array, object, or primitive can each be overwritten with a value of a different type.
+		/// For example, <c>{"a":[1,2]}</c> written with path <c>["a"]</c> and value <c>"b"</c>
+		/// produces <c>{"a":"b"}</c>.
+		/// </para>
 		/// Node reshaping rules applied during traversal:
 		/// <list type="bullet">
-		///   <item>Missing object properties and null/value intermediate nodes are replaced with a new <see cref="JsonObject"/>.</item>
+		///   <item>Missing object properties and <see langword="null"/> or value intermediate nodes are replaced with a new <see cref="JsonObject"/>.</item>
 		///   <item>Array + integer index in bounds: navigates or sets that element.</item>
-		///   <item>Array + integer index out of bounds: appends one element to the end.</item>
+		///   <item>Array + integer index out of bounds: appends one element to the end. This append always occurs even when <paramref name="initOnly"/> is <see langword="true"/>, because no existing element is present to protect.</item>
 		///   <item>Array + non-integer key: replaces the array with a <see cref="JsonObject"/> — the path segment implies object structure.</item>
 		/// </list>
 		/// </remarks>
