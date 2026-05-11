@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace Albatross.Json {
@@ -16,28 +16,35 @@ namespace Albatross.Json {
 		}
 
 		/// <summary>
-		/// Sets a value at the specified path within a JSON node structure.
+		/// Sets a value at the specified path within a JSON node tree, creating or reshaping intermediate nodes as needed.
 		/// </summary>
-		/// <typeparam name="T">The type of the value to set.</typeparam>
-		/// <param name="node">The root JSON node. If null, a new JsonObject is created.</param>
-		/// <param name="path">The path segments to navigate. Use numeric strings for array indices.</param>
-		/// <param name="value">The value to set at the specified path.</param>
+		/// <param name="node">Root of the tree to modify. A new <see cref="JsonObject"/> is created when null.</param>
+		/// <param name="path">
+		/// Dot-free path segments to navigate. Integer strings are treated as array indices;
+		/// all other strings are treated as object property names.
+		/// </param>
+		/// <param name="value">Value to serialize and place at the target path.</param>
+		/// <param name="options">Serializer options applied to both navigation (case sensitivity) and value serialization.</param>
+		/// <param name="initOnly">
+		/// When true, skips the write if a non-null value already exists at the target path.
+		/// Useful for setting defaults without overwriting existing data.
+		/// </param>
 		/// <returns>
-		/// The modified root node, or the serialized value if path is empty.
+		/// The modified root node. When <paramref name="path"/> is empty, returns the serialized
+		/// <paramref name="value"/> directly, replacing the root.
 		/// </returns>
 		/// <remarks>
-		/// Behavior:
+		/// Node reshaping rules applied during traversal:
 		/// <list type="bullet">
-		///   <item>If path is empty, returns the serialized value directly (replaces entire node).</item>
-		///   <item>Creates intermediate JsonObjects automatically when navigating non-existent paths.</item>
-		///   <item>Overwrites existing value nodes (JsonValue) with JsonObjects when the path continues through them.</item>
-		///   <item>For arrays, path segments must be valid integer indices within bounds.</item>
+		///   <item>Missing object properties and null/value intermediate nodes are replaced with a new <see cref="JsonObject"/>.</item>
+		///   <item>Array + integer index in bounds: navigates or sets that element.</item>
+		///   <item>Array + integer index out of bounds: appends one element to the end.</item>
+		///   <item>Array + non-integer key: replaces the array with a <see cref="JsonObject"/> — the path segment implies object structure.</item>
 		/// </list>
 		/// </remarks>
-		/// <exception cref="ArgumentException">Thrown when an array index is out of bounds or not a valid integer.</exception>
-		public static JsonNode? SetValue<T>(this JsonNode? node, string[] path, T? value, JsonSerializerOptions options) {
+		public static JsonNode? SetValue<T>(this JsonNode? node, string[] path, T? value, JsonSerializerOptions options, bool initOnly = false) {
 			if (node == null) { node = new JsonObject(); }
-			var serializedValue = System.Text.Json.JsonSerializer.SerializeToNode(value, options);
+			var serializedValue = JsonSerializer.SerializeToNode(value, options);
 			if (path.Length == 0) {
 				return serializedValue;
 			}
@@ -50,55 +57,97 @@ namespace Albatross.Json {
 				if (current is JsonObject obj) {
 					string actualKey = FindPropertyKey(obj, key, options.PropertyNameCaseInsensitive) ?? key;
 					if (!obj.TryGetPropertyValue(actualKey, out var next) || next is null || next is JsonValue) {
+						if (actualKey != key) { obj.Remove(actualKey); }
 						next = new JsonObject();
-						obj[actualKey] = next;
+						obj[key] = next;
+					} else if (actualKey != key) {
+						obj.Remove(actualKey);
+						obj[key] = next;
 					}
 					parent = current;
-					parentKey = actualKey;
+					parentKey = key;
 					current = next;
 				} else if (current is JsonArray arr) {
-					if (int.TryParse(key, out int index) && index >= 0 && index < arr.Count) {
-						var next = arr[index];
-						if (next is null || next is JsonValue) {
+					if (int.TryParse(key, out int index)) {
+						if (index < 0) { throw new ArgumentException($"Negative array index: {key}"); }
+						JsonNode next;
+						if (index < arr.Count) {
+							var elem = arr[index];
+							if (elem is null || elem is JsonValue) {
+								elem = new JsonObject();
+								arr[index] = elem;
+							}
+							next = elem;
+						} else {
 							next = new JsonObject();
-							arr[index] = next;
+							arr.Add(next);
 						}
 						parent = current;
 						parentKey = key;
 						current = next;
 					} else {
-						throw new ArgumentException($"Invalid array index: {key}");
+						// non-integer key: replace array with JsonObject and retry
+						var replacement = new JsonObject();
+						if (parent is JsonObject parentObj) {
+							parentObj[parentKey!] = replacement;
+						} else if (parent is JsonArray parentArr && int.TryParse(parentKey, out int idx)) {
+							parentArr[idx] = replacement;
+						} else {
+							node = replacement;
+						}
+						current = replacement;
+						i--;
 					}
 				} else {
-					// current is a JsonValue - replace it with JsonObject
 					var replacement = new JsonObject();
 					if (parent is JsonObject parentObj) {
 						parentObj[parentKey!] = replacement;
 					} else if (parent is JsonArray parentArr && int.TryParse(parentKey, out int idx)) {
 						parentArr[idx] = replacement;
+					} else {
+						node = replacement;
 					}
 					current = replacement;
-					i--; // retry this path segment with the new object
+					i--;
 				}
 			}
 
 			string finalKey = path[^1];
 			if (current is JsonObject finalObj) {
 				string actualFinalKey = FindPropertyKey(finalObj, finalKey, options.PropertyNameCaseInsensitive) ?? finalKey;
-				finalObj[actualFinalKey] = serializedValue;
+				if (initOnly && finalObj.TryGetPropertyValue(actualFinalKey, out var existing) && existing != null) {
+					return node;
+				}
+				if (actualFinalKey != finalKey) { finalObj.Remove(actualFinalKey); }
+				finalObj[finalKey] = serializedValue;
 			} else if (current is JsonArray finalArr) {
-				if (int.TryParse(finalKey, out int index) && index >= 0 && index < finalArr.Count) {
-					finalArr[index] = serializedValue;
+				if (int.TryParse(finalKey, out int index)) {
+					if (index < 0) { throw new ArgumentException($"Negative array index: {finalKey}"); }
+					if (index < finalArr.Count) {
+						if (initOnly && finalArr[index] != null) { return node; }
+						finalArr[index] = serializedValue;
+					} else {
+						finalArr.Add(serializedValue);
+					}
 				} else {
-					throw new ArgumentException($"Invalid array index: {finalKey}");
+					// non-integer key: replace array with JsonObject
+					var replacement = new JsonObject { [finalKey] = serializedValue };
+					if (parent is JsonObject parentObj) {
+						parentObj[parentKey!] = replacement;
+					} else if (parent is JsonArray parentArr && int.TryParse(parentKey, out int idx)) {
+						parentArr[idx] = replacement;
+					} else {
+						return replacement;
+					}
 				}
 			} else {
-				// current is a JsonValue - replace it with JsonObject containing the final key
 				var replacement = new JsonObject { [finalKey] = serializedValue };
 				if (parent is JsonObject parentObj) {
 					parentObj[parentKey!] = replacement;
 				} else if (parent is JsonArray parentArr && int.TryParse(parentKey, out int idx)) {
 					parentArr[idx] = replacement;
+				} else {
+					return replacement;
 				}
 			}
 			return node;

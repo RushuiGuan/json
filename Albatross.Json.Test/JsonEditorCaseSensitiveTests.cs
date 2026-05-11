@@ -52,17 +52,25 @@ namespace Albatross.Json.Test {
 			Assert.Equal(expectedFormatted, result?.ToJsonString(options));
 		}
 		[Fact]
-		public void TestSetValue_InvalidArrayIndex_ThrowsException() {
-			var json = """{"arr":[1,2,3]}""";
-			var node = JsonNode.Parse(json);
-			Assert.Throws<ArgumentException>(() => Extensions.SetValue(node, ["arr", "10"], "value", options));
+		public void TestSetValue_NegativeArrayIndex_ThrowsException() {
+			var node = JsonNode.Parse("""{"arr":[1,2,3]}""");
+			Assert.Throws<ArgumentException>(() => Extensions.SetValue(node, ["arr", "-1"], "value", options));
 		}
 
 		[Fact]
-		public void TestSetValue_InvalidArrayIndexFormat_ThrowsException() {
+		public void TestSetValue_OutOfBoundArrayIndex_ExpandsArray() {
 			var json = """{"arr":[1,2,3]}""";
 			var node = JsonNode.Parse(json);
-			Assert.Throws<ArgumentException>(() => Extensions.SetValue(node, ["arr", "invalid"], "value", options));
+			var result = Extensions.SetValue(node, ["arr", "10"], "value", options);
+			Assert.Equal("""{"arr":[1,2,3,"value"]}""", result?.ToJsonString(options));
+		}
+
+		[Fact]
+		public void TestSetValue_InvalidArrayIndexFormat_ReplacesArrayWithObject() {
+			var json = """{"arr":[1,2,3]}""";
+			var node = JsonNode.Parse(json);
+			var result = Extensions.SetValue(node, ["arr", "invalid"], "value", options);
+			Assert.Equal("""{"arr":{"invalid":"value"}}""", result?.ToJsonString(options));
 		}
 
 		// Case-sensitive specific tests: different casing creates new properties
